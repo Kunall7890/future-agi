@@ -372,7 +372,7 @@ const TestEvaluationPage = ({
             show={
               executionIds ? executionIds?.length === 0 : selectedCount === 0
             }
-            title="Please select at least one Test Run to run"
+            title="Please select at least one Test Run from grid to run evaluation"
             arrow
             placement="top"
             size="small"

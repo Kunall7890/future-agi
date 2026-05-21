@@ -39,6 +39,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
 
+from tracer.services.clickhouse.query_builders.base import NIL_UUID
+
 logger = structlog.get_logger(__name__)
 from model_hub.models.choices import AnnotationTypeChoices
 from model_hub.models.develop_annotations import AnnotationsLabels
@@ -5484,7 +5486,11 @@ class TraceView(BaseModelViewSetMixin, ModelViewSet):
                 "cost": row.get("cost"),
                 "model": row.get("model"),
                 "provider": row.get("provider"),
-                "session_id": row.get("trace_session_id"),
+                "session_id": (
+                    None
+                    if str(row.get("trace_session_id", "")) == NIL_UUID
+                    else row.get("trace_session_id")
+                ),
                 "tags": row.get("trace_tags") or [],
             }
 

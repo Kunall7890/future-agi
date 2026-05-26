@@ -97,19 +97,17 @@ def _log_and_deduct_cost_for_external_eval(
             token_usage_properties = lambda token_usage: {}
 
         if emit is not None and UsageEvent is not None:
-
-
             emit(
-            UsageEvent(
-                org_id=str(config.organization.id),
-                event_type=api_call_type,
-                properties={
-                    "source": "tracer",
-                    "source_id": str(config.id),
-                    **token_usage_properties(log_config),
-                },
+                UsageEvent(
+                    org_id=str(config.organization.id),
+                    event_type=api_call_type,
+                    properties={
+                        "source": "tracer",
+                        "source_id": str(config.id),
+                        **token_usage_properties(log_config.get("token_usage", {})),
+                    },
+                )
             )
-        )
     except Exception:
         pass  # Metering failure must not break the action
 

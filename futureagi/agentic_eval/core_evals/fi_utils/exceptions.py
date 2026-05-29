@@ -31,5 +31,6 @@ class MediaNotAccessibleError(ValueError):
         suffix = f" for '{key}'" if key else ""
         super().__init__(
             f"Media file is not accessible{suffix}. "
-            f"Please ensure the URL is valid and reachable."
+            f"The file could not be downloaded — please ensure "
+            f"the URL is valid and accessible."
         )

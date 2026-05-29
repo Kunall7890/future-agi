@@ -14,10 +14,13 @@ import re
 from typing import Any, Dict, List, Optional, Sequence, Union
 
 import requests
+import structlog
 
 from agentic_eval.core.utils.model_config import LiteLlmProvider
 from agentic_eval.core_evals.fi_utils.exceptions import MediaNotAccessibleError
 from tfc.utils.storage import download_image_from_url
+
+logger = structlog.get_logger(__name__)
 
 ContentBlock = Dict[str, Any]
 Message = Dict[str, Any]
@@ -440,10 +443,17 @@ def build_media_content_block(
                 # Uses download_image_from_url which validates with Pillow.
                 try:
                     img_bytes = download_image_from_url(img_str)
-                    mime = mimetypes.guess_type(img_str)[0] or "image/jpeg"
-                    url = f"data:{mime};base64,{base64.b64encode(img_bytes).decode('utf-8')}"
                 except Exception as e:
+                    logger.warning(
+                        "media_download_failed",
+                        key=key,
+                        url=img_str[:200],
+                        media_type="image",
+                        error=str(e),
+                    )
                     raise MediaNotAccessibleError(key=key) from e
+                mime = mimetypes.guess_type(img_str)[0] or "image/jpeg"
+                url = f"data:{mime};base64,{base64.b64encode(img_bytes).decode('utf-8')}"
             else:
                 url = standardize_to_data_uri(img, "image/jpeg")
             tag = f"{key}_{img_num}" if len(image_inputs) > 1 else key
@@ -467,6 +477,13 @@ def build_media_content_block(
             try:
                 b64_data, audio_fmt = download_audio_url_to_base64(val_str)
             except Exception as e:
+                logger.warning(
+                    "media_download_failed",
+                    key=key,
+                    url=val_str[:200],
+                    media_type="audio",
+                    error=str(e),
+                )
                 raise MediaNotAccessibleError(key=key) from e
             data_uri = f"data:audio/{audio_fmt};base64,{b64_data}"
         else:
@@ -572,6 +589,11 @@ def detect_and_build_media_blocks(
             elif str(media_type).lower() == "file":
                 val = remaining.get(key, "") if isinstance(remaining, dict) else ""
                 if isinstance(val, str) and val.startswith(("http://", "https://")):
+                    logger.warning(
+                        "media_unreachable_stage2",
+                        key=key,
+                        url=val[:200],
+                    )
                     raise MediaNotAccessibleError(key=key)
 
     # Build content blocks from detected types

@@ -688,6 +688,7 @@ class TestMessageHandling:
 @pytest.mark.integration
 @pytest.mark.live_llm
 @pytest.mark.external
+@pytest.mark.django_db
 class TestOpenAILiveIntegration:
     """Live integration tests for OpenAI models."""
 
@@ -704,8 +705,8 @@ class TestOpenAILiveIntegration:
         from agentic_eval.core_evals.run_prompt.litellm_response import RunPrompt
 
         mock_custom_model.objects.filter.return_value.values.return_value = []
-        mock_custom_model.objects.get.side_effect = mock_custom_model.DoesNotExist
         mock_custom_model.DoesNotExist = Exception
+        mock_custom_model.objects.get.side_effect = mock_custom_model.DoesNotExist
 
         mock_api_key_entry = Mock()
         mock_api_key_entry.key = api_keys["openai"]
@@ -731,7 +732,10 @@ class TestOpenAILiveIntegration:
         result = run_prompt.litellm_response()
 
         assert result is not None
-        assert "response" in result or "content" in str(result).lower()
+        # litellm_response returns a (response_text, metadata) tuple; assert the
+        # model produced non-empty response text.
+        response_text = result[0] if isinstance(result, tuple) else result
+        assert response_text
 
     @patch("agentic_eval.core_evals.run_prompt.litellm_models.ApiKey")
     @patch("agentic_eval.core_evals.run_prompt.litellm_models.CustomAIModel")
@@ -740,8 +744,8 @@ class TestOpenAILiveIntegration:
         from agentic_eval.core_evals.run_prompt.litellm_response import RunPrompt
 
         mock_custom_model.objects.filter.return_value.values.return_value = []
-        mock_custom_model.objects.get.side_effect = mock_custom_model.DoesNotExist
         mock_custom_model.DoesNotExist = Exception
+        mock_custom_model.objects.get.side_effect = mock_custom_model.DoesNotExist
 
         mock_api_key_entry = Mock()
         mock_api_key_entry.key = api_keys["openai"]
@@ -780,6 +784,7 @@ class TestOpenAILiveIntegration:
 @pytest.mark.integration
 @pytest.mark.live_llm
 @pytest.mark.external
+@pytest.mark.django_db
 class TestAnthropicLiveIntegration:
     """Live integration tests for Anthropic models."""
 
@@ -796,8 +801,8 @@ class TestAnthropicLiveIntegration:
         from agentic_eval.core_evals.run_prompt.litellm_response import RunPrompt
 
         mock_custom_model.objects.filter.return_value.values.return_value = []
-        mock_custom_model.objects.get.side_effect = mock_custom_model.DoesNotExist
         mock_custom_model.DoesNotExist = Exception
+        mock_custom_model.objects.get.side_effect = mock_custom_model.DoesNotExist
 
         mock_api_key_entry = Mock()
         mock_api_key_entry.key = api_keys["anthropic"]
@@ -806,7 +811,7 @@ class TestAnthropicLiveIntegration:
         mock_api_key.objects.get.return_value = mock_api_key_entry
 
         run_prompt = RunPrompt(
-            model="claude-3-5-haiku-20241022",  # Using Haiku for cost efficiency
+            model="claude-haiku-4-5-20251001",  # Using current Haiku for cost efficiency
             messages=simple_messages,
             organization_id=mock_organization_id,
             output_format="text",
@@ -814,7 +819,8 @@ class TestAnthropicLiveIntegration:
             frequency_penalty=0.0,
             presence_penalty=0.0,
             max_tokens=100,
-            top_p=1.0,
+            # claude 4.x rejects temperature and top_p together; send temperature only
+            top_p=None,
             response_format=None,
             tool_choice=None,
             tools=None,
@@ -831,6 +837,7 @@ class TestAnthropicLiveIntegration:
 @pytest.mark.integration
 @pytest.mark.live_llm
 @pytest.mark.external
+@pytest.mark.django_db
 class TestGroqLiveIntegration:
     """Live integration tests for Groq models."""
 
@@ -847,8 +854,8 @@ class TestGroqLiveIntegration:
         from agentic_eval.core_evals.run_prompt.litellm_response import RunPrompt
 
         mock_custom_model.objects.filter.return_value.values.return_value = []
-        mock_custom_model.objects.get.side_effect = mock_custom_model.DoesNotExist
         mock_custom_model.DoesNotExist = Exception
+        mock_custom_model.objects.get.side_effect = mock_custom_model.DoesNotExist
 
         mock_api_key_entry = Mock()
         mock_api_key_entry.key = api_keys["groq"]
@@ -882,6 +889,7 @@ class TestGroqLiveIntegration:
 @pytest.mark.integration
 @pytest.mark.live_llm
 @pytest.mark.external
+@pytest.mark.django_db
 class TestXAILiveIntegration:
     """Live integration tests for xAI models."""
 
@@ -898,8 +906,8 @@ class TestXAILiveIntegration:
         from agentic_eval.core_evals.run_prompt.litellm_response import RunPrompt
 
         mock_custom_model.objects.filter.return_value.values.return_value = []
-        mock_custom_model.objects.get.side_effect = mock_custom_model.DoesNotExist
         mock_custom_model.DoesNotExist = Exception
+        mock_custom_model.objects.get.side_effect = mock_custom_model.DoesNotExist
 
         mock_api_key_entry = Mock()
         mock_api_key_entry.key = api_keys["xai"]
@@ -908,13 +916,14 @@ class TestXAILiveIntegration:
         mock_api_key.objects.get.return_value = mock_api_key_entry
 
         run_prompt = RunPrompt(
-            model="xai/grok-beta",
+            model="xai/grok-3",
             messages=simple_messages,
             organization_id=mock_organization_id,
             output_format="text",
             temperature=0.7,
-            frequency_penalty=0.0,
-            presence_penalty=0.0,
+            # grok-3 rejects presence/frequency penalty params
+            frequency_penalty=None,
+            presence_penalty=None,
             max_tokens=100,
             top_p=1.0,
             response_format=None,
@@ -949,8 +958,8 @@ class TestPerplexityLiveIntegration:
         from agentic_eval.core_evals.run_prompt.litellm_response import RunPrompt
 
         mock_custom_model.objects.filter.return_value.values.return_value = []
-        mock_custom_model.objects.get.side_effect = mock_custom_model.DoesNotExist
         mock_custom_model.DoesNotExist = Exception
+        mock_custom_model.objects.get.side_effect = mock_custom_model.DoesNotExist
 
         mock_api_key_entry = Mock()
         mock_api_key_entry.key = api_keys["perplexity"]

@@ -24,6 +24,7 @@ from asgiref.sync import sync_to_async
 
 from model_hub.utils.websocket_manager import WebSocketManager
 from agentic_eval.core_evals.run_prompt.error_handler import (
+    ErrorContext,
     handle_api_error,
     litellm_try_except,
 )
@@ -762,17 +763,17 @@ class LLMHandler(BaseModelHandler):
 
         raise Exception(concise_error) from error
 
-    def _error_context(self) -> Dict[str, Any]:
-        return {
-            "model": self.context.model,
-            "temperature": self.context.temperature,
-            "max_tokens": self.context.max_tokens,
-            "message_count": len(self.context.messages) if self.context.messages else 0,
-            "output_format": self.context.output_format,
-            "organization_id": self.context.organization_id,
-            "workspace_id": self.context.workspace_id,
-            "template_id": self.context.template_id,
-        }
+    def _error_context(self) -> ErrorContext:
+        return ErrorContext(
+            model=self.context.model,
+            temperature=self.context.temperature,
+            max_tokens=self.context.max_tokens,
+            message_count=len(self.context.messages) if self.context.messages else 0,
+            output_format=self.context.output_format,
+            organization_id=self.context.organization_id,
+            workspace_id=self.context.workspace_id,
+            template_id=self.context.template_id,
+        )
 
     def _build_stopped_response(
         self, response_content: str, chunk: Any, start_time: float

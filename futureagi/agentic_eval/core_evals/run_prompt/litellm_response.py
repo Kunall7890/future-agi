@@ -62,6 +62,7 @@ from agentic_eval.core_evals.run_prompt.other_services.elevenlabs_response impor
 )
 from model_hub.utils.utils import get_model_mode
 from agentic_eval.core_evals.run_prompt.error_handler import (
+    ErrorContext,
     handle_api_error,
     litellm_try_except,
 )
@@ -1270,16 +1271,16 @@ class RunPrompt:
                 raise Exception(str(e))
 
             # Build context for error logging
-            context = {
-                "model": self.model,
-                "temperature": self.temperature,
-                "max_tokens": self.max_tokens,
-                "message_count": len(self.messages) if self.messages else 0,
-                "output_format": self.output_format,
-                "organization_id": self.organization_id,
-                "workspace_id": self.workspace_id,
-                "template_id": template_id,
-            }
+            context = ErrorContext(
+                model=self.model,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+                message_count=len(self.messages) if self.messages else 0,
+                output_format=self.output_format,
+                organization_id=self.organization_id,
+                workspace_id=self.workspace_id,
+                template_id=template_id,
+            )
 
             # Use error handler for concise message and verbose logging
             concise_error = handle_api_error(e, logger, context)
@@ -2124,15 +2125,15 @@ class RunPrompt:
 
         except Exception as e:
             # Build context for error logging
-            context = {
-                "model": self.model,
-                "temperature": self.temperature,
-                "max_tokens": self.max_tokens,
-                "message_count": len(self.messages) if self.messages else 0,
-                "output_format": self.output_format,
-                "organization_id": self.organization_id,
-                "workspace_id": self.workspace_id,
-            }
+            context = ErrorContext(
+                model=self.model,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+                message_count=len(self.messages) if self.messages else 0,
+                output_format=self.output_format,
+                organization_id=self.organization_id,
+                workspace_id=self.workspace_id,
+            )
 
             logger.info(f"Original messages: {payload.get('messages', [])}")
 
@@ -2701,15 +2702,15 @@ class RunPrompt:
                 return await sync_to_async(self._regular_response)(payload, start_time)
         except Exception as e:
             # Build context for error logging
-            context = {
-                "model": self.model,
-                "temperature": self.temperature,
-                "max_tokens": self.max_tokens,
-                "message_count": len(self.messages) if self.messages else 0,
-                "output_format": self.output_format,
-                "organization_id": self.organization_id,
-                "workspace_id": self.workspace_id,
-            }
+            context = ErrorContext(
+                model=self.model,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+                message_count=len(self.messages) if self.messages else 0,
+                output_format=self.output_format,
+                organization_id=self.organization_id,
+                workspace_id=self.workspace_id,
+            )
 
             logger.info(f"Original messages: {payload.get('messages', [])}")
 
@@ -2967,16 +2968,16 @@ class RunPrompt:
                 raise Exception(str(e))
 
             # Build context for error logging
-            context = {
-                "model": self.model,
-                "temperature": self.temperature,
-                "max_tokens": self.max_tokens,
-                "message_count": len(self.messages) if self.messages else 0,
-                "output_format": self.output_format,
-                "organization_id": self.organization_id,
-                "workspace_id": self.workspace_id,
-                "template_id": template_id,
-            }
+            context = ErrorContext(
+                model=self.model,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+                message_count=len(self.messages) if self.messages else 0,
+                output_format=self.output_format,
+                organization_id=self.organization_id,
+                workspace_id=self.workspace_id,
+                template_id=template_id,
+            )
 
             # Use error handler for concise message and verbose logging
             concise_error = handle_api_error(e, logger, context)
@@ -3185,16 +3186,16 @@ class RunPrompt:
             return handler_response.to_value_info()
 
         except Exception as e:
-            context = {
-                "model": self.model,
-                "temperature": self.temperature,
-                "max_tokens": self.max_tokens,
-                "message_count": len(self.messages) if self.messages else 0,
-                "output_format": self.output_format,
-                "organization_id": self.organization_id,
-                "workspace_id": self.workspace_id,
-                "template_id": template_id,
-            }
+            context = ErrorContext(
+                model=self.model,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+                message_count=len(self.messages) if self.messages else 0,
+                output_format=self.output_format,
+                organization_id=self.organization_id,
+                workspace_id=self.workspace_id,
+                template_id=template_id,
+            )
             concise_error = handle_api_error(e, logger, context)
             logger.error(f"[NEW] An error occurred: {concise_error}")
             raise Exception(concise_error) from e
@@ -3281,16 +3282,16 @@ class RunPrompt:
             return handler_response.to_value_info()
 
         except Exception as e:
-            context = {
-                "model": self.model,
-                "temperature": self.temperature,
-                "max_tokens": self.max_tokens,
-                "message_count": len(self.messages) if self.messages else 0,
-                "output_format": self.output_format,
-                "organization_id": self.organization_id,
-                "workspace_id": self.workspace_id,
-                "template_id": template_id,
-            }
+            context = ErrorContext(
+                model=self.model,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+                message_count=len(self.messages) if self.messages else 0,
+                output_format=self.output_format,
+                organization_id=self.organization_id,
+                workspace_id=self.workspace_id,
+                template_id=template_id,
+            )
             concise_error = handle_api_error(e, logger, context)
             logger.error(f"[NEW] An error occurred: {concise_error}")
             raise Exception(concise_error) from e

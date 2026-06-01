@@ -6,6 +6,14 @@ class DummyLogger:
         pass
 
 
+class CapturingLogger:
+    def __init__(self):
+        self.fields = None
+
+    def error(self, *args, **kwargs):
+        self.fields = kwargs
+
+
 def _raise_masked_api_key_error():
     try:
         raise Exception(
@@ -102,6 +110,44 @@ def test_handle_api_error_formats_provider_model_not_found():
         "Model not found: missing-model-id. Select a model available for the "
         "configured provider/account, or update the model/provider configuration."
     )
+
+
+@pytest.mark.unit
+def test_handle_api_error_accepts_error_context_dataclass():
+    from agentic_eval.core_evals.run_prompt.error_handler import (
+        ErrorContext,
+        handle_api_error,
+    )
+
+    logger = CapturingLogger()
+    context = ErrorContext(
+        model="gpt-4o",
+        temperature=0.7,
+        message_count=2,
+        organization_id="org-id",
+    )
+
+    handle_api_error(Exception("boom"), logger, context)
+
+    # Dataclass is coerced to a logging dict, and unset (None) fields are
+    # dropped so the output matches the legacy dict behaviour.
+    assert logger.fields["model"] == "gpt-4o"
+    assert logger.fields["temperature"] == 0.7
+    assert logger.fields["organization_id"] == "org-id"
+    assert "max_tokens" not in logger.fields
+    assert "template_id" not in logger.fields
+
+
+@pytest.mark.unit
+def test_handle_api_error_still_accepts_plain_dict_context():
+    from agentic_eval.core_evals.run_prompt.error_handler import handle_api_error
+
+    logger = CapturingLogger()
+
+    handle_api_error(Exception("boom"), logger, {"model": "gpt-4o", "max_tokens": 512})
+
+    assert logger.fields["model"] == "gpt-4o"
+    assert logger.fields["max_tokens"] == 512
 
 
 @pytest.mark.unit

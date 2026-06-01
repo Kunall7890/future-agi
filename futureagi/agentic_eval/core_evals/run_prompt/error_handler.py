@@ -9,7 +9,8 @@ Provides centralized error parsing and formatting to ensure:
 import json
 import re
 from contextlib import contextmanager
-from typing import Any, Callable, Dict, Iterator, Optional
+from dataclasses import asdict, dataclass, is_dataclass
+from typing import Any, Callable, Dict, Iterator, Optional, Union
 
 import structlog
 from litellm import (
@@ -35,6 +36,45 @@ from litellm import (
 from tfc.utils.error_codes import get_error_message
 
 _logger = structlog.get_logger(__name__)
+
+
+@dataclass
+class ErrorContext:
+    """Structured request/user context attached to error logs.
+
+    Replaces the loosely-typed dict that used to be threaded through the error
+    pipeline so callers get field-name checking. Every field is optional; only
+    the ones a given call site can populate are set, and unset (``None``) fields
+    are dropped before logging.
+    """
+
+    model: Optional[str] = None
+    temperature: Optional[float] = None
+    max_tokens: Optional[int] = None
+    message_count: Optional[int] = None
+    output_format: Optional[str] = None
+    frequency_penalty: Optional[float] = None
+    presence_penalty: Optional[float] = None
+    top_p: Optional[float] = None
+    provider: Optional[str] = None
+    organization_id: Optional[Any] = None
+    workspace_id: Optional[Any] = None
+    template_id: Optional[Any] = None
+
+
+def _as_context_dict(
+    context: Optional[Union[Dict[str, Any], "ErrorContext"]],
+) -> Dict[str, Any]:
+    """Coerce an ``ErrorContext`` (or legacy dict) into a logging dict.
+
+    ``ErrorContext`` fields left at their ``None`` default are omitted so the
+    log output matches the old "only include populated keys" behaviour.
+    """
+    if context is None:
+        return {}
+    if is_dataclass(context) and not isinstance(context, type):
+        return {k: v for k, v in asdict(context).items() if v is not None}
+    return context
 
 LITELLM_EXCEPTION_ERROR_CODES = {
     BadRequestError: "LITELLM_BAD_REQUEST",
@@ -484,7 +524,9 @@ def log_verbose_error(
 
 
 def handle_api_error(
-    exception: Exception, logger, context: Optional[Dict[str, Any]] = None
+    exception: Exception,
+    logger,
+    context: Optional[Union[Dict[str, Any], "ErrorContext"]] = None,
 ) -> str:
     """
     Complete error handling pipeline: parse, log, and format.
@@ -502,8 +544,7 @@ def handle_api_error(
     Returns:
         Concise error string suitable for cell values
     """
-    if context is None:
-        context = {}
+    context = _as_context_dict(context)
 
     # Recover the real API error if the exception was masked by an
     # instrumentation bug (e.g. traceai_litellm __exit__ arg-order issue).

@@ -1844,6 +1844,8 @@ class RunPrompt:
             else:
                 payload["api_key"] = api_key
         else:
+            if provider != "openai":
+                payload["custom_llm_provider"] = provider
             payload["api_key"] = api_key
 
         return payload
@@ -3183,8 +3185,19 @@ class RunPrompt:
             return handler_response.to_value_info()
 
         except Exception as e:
-            logger.error(f"[NEW] An error occurred: {str(e)}")
-            raise Exception(str(e))
+            context = {
+                "model": self.model,
+                "temperature": self.temperature,
+                "max_tokens": self.max_tokens,
+                "message_count": len(self.messages) if self.messages else 0,
+                "output_format": self.output_format,
+                "organization_id": self.organization_id,
+                "workspace_id": self.workspace_id,
+                "template_id": template_id,
+            }
+            concise_error = handle_api_error(e, logger, context)
+            logger.error(f"[NEW] An error occurred: {concise_error}")
+            raise Exception(concise_error) from e
 
     async def _litellm_response_async_new(
         self,
@@ -3268,8 +3281,19 @@ class RunPrompt:
             return handler_response.to_value_info()
 
         except Exception as e:
-            logger.error(f"[NEW] An error occurred: {str(e)}")
-            raise Exception(str(e))
+            context = {
+                "model": self.model,
+                "temperature": self.temperature,
+                "max_tokens": self.max_tokens,
+                "message_count": len(self.messages) if self.messages else 0,
+                "output_format": self.output_format,
+                "organization_id": self.organization_id,
+                "workspace_id": self.workspace_id,
+                "template_id": template_id,
+            }
+            concise_error = handle_api_error(e, logger, context)
+            logger.error(f"[NEW] An error occurred: {concise_error}")
+            raise Exception(concise_error) from e
 
     # =========================================================================
     # PUBLIC API - WRAPPER METHODS THAT TOGGLE BETWEEN OLD AND NEW

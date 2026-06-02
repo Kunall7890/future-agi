@@ -81,6 +81,7 @@ function PlanCard({
   redirectToPlan,
 }) {
   const [isLoadingButton, setIsLoadingButton] = useState(false);
+  const isPaygPlan = plan === PLAN_TYPES.PRO;
 
   const handleContactSales = () => {
     trackEvent(Events.contactSalesClicked);
@@ -177,7 +178,7 @@ function PlanCard({
         </Box>
       </Box>
       <Box sx={{ borderBottom: "1px solid", borderColor: "divider", pb: 1 }}>
-        {plan != PLAN_TYPES.CUSTOM && (
+        {plan != PLAN_TYPES.CUSTOM && !isPaygPlan && (
           <Typography
             variant="h5"
             sx={{ fontSize: "16px" }}
@@ -195,6 +196,27 @@ function PlanCard({
               /monthly
             </Typography>
           </Typography>
+        )}
+
+        {isPaygPlan && (
+          <Box>
+            <Typography
+              variant="h5"
+              sx={{ fontSize: "16px" }}
+              color={"text.primary"}
+              fontWeight={600}
+            >
+              Usage-based
+            </Typography>
+            <Typography
+              variant="body2"
+              sx={{ fontSize: "12px" }}
+              fontWeight={400}
+              color="text.primary"
+            >
+              No monthly platform fee
+            </Typography>
+          </Box>
         )}
 
         {plan == PLAN_TYPES.CUSTOM && (

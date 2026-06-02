@@ -134,6 +134,8 @@ describe("UploadLimitNotification", () => {
       await screen.findByText("Want to process more data per minute?"),
     ).toBeInTheDocument();
     expect(screen.getByText("Upgrade to PAYG")).toBeInTheDocument();
+    expect(screen.getByText("Usage-based")).toBeInTheDocument();
+    expect(screen.getByText("No monthly platform fee")).toBeInTheDocument();
     expect(mocks.get).toHaveBeenCalledWith("/usage/v2/plans-and-addons/");
     await waitFor(() => expect(mocks.navigate).not.toHaveBeenCalled());
   });

@@ -49,7 +49,6 @@ import { ID_ONLY_FIELDS } from "./idFields";
 // ---------------------------------------------------------------------------
 const BASE_TRACE_FILTER_FIELDS = [
   { value: "name", label: "Trace Name", type: "string" },
-  { value: "span_name", label: "Span Name", type: "string" },
   {
     value: "status",
     label: "Status",
@@ -71,10 +70,8 @@ const BASE_TRACE_FILTER_FIELDS = [
       "embedding",
     ],
   },
-  { value: "user_id", label: "User ID", type: "string" },
-  { value: "service_name", label: "Service / Trace Name", type: "string" },
+  { value: "service_name", label: "Service Name", type: "string" },
   { value: "provider", label: "Provider", type: "string" },
-  { value: "span_kind", label: "Span Kind", type: "string" },
   { value: "tag", label: "Tag", type: "string" },
 ];
 
@@ -174,7 +171,13 @@ const THUMBS_OPS = [
 
 const ANNOTATOR_OPS = [{ value: "is", label: "is" }];
 
-const ID_ONLY_OPS = [{ value: "is", label: "is" }];
+// Direct ID columns on `spans`. UUIDs don't need substring/null ops —
+// restrict to equality (canonical IN / NOT IN, multi-select on the value
+// picker).
+const ID_ONLY_OPS = [
+  { value: "in", label: "equals" },
+  { value: "not_in", label: "not equals" },
+];
 
 const ARRAY_OPS = [
   { value: "contains", label: "contains" },
@@ -353,6 +356,8 @@ const EXCLUDED_METRICS = new Set([
   "eval_source",
   "row_count",
   "cell_error_rate",
+  // duplicate of node_type — both map to observation_type
+  "span_kind",
 ]);
 const PROPERTY_PICKER_RENDER_LIMIT = 250;
 
@@ -466,6 +471,11 @@ function useTraceFilterProperties(
     queryFn: async () => {
       const params = {};
       if (projectId) params.project_ids = projectId;
+      // Observe filter dropdown wants per-CustomEvalConfig eval entries (so
+      // the dropdown matches the per-config columns in the trace/span list
+      // table). Default behaviour at /tracer/dashboard/metrics/ is still
+      // template-level — used by dashboards, PrimaryGraph, widget pickers.
+      params.per_eval_config = true;
       const { data } = await axios.get(endpoints.dashboard.metrics, { params });
       return data?.result?.metrics || [];
     },
@@ -1500,10 +1510,7 @@ function FilterRow({
         source={source}
         property={properties.find((p) => p.id === filter.field)}
         freeSoloValues={rowFreeSoloValues}
-        singleSelect={
-          ID_ONLY_FIELDS.has(filter.field) ||
-          SINGLE_VALUE_OPS.has(safeOperator)
-        }
+        singleSelect={SINGLE_VALUE_OPS.has(safeOperator)}
         onChange={(newVal) => updateRow({ value: newVal })}
       />
     );
@@ -1652,9 +1659,7 @@ const TraceFilterPanel = ({
       return {
         id: f.value,
         name: f.label,
-        // trace_id / span_id are direct column filters — omit category so
-        // col_type is not injected (the backend handles them without it).
-        ...(!ID_ONLY_FIELDS.has(f.value) && { category: "system" }),
+        category: "system",
         type: f.type === "enum" ? "string" : f.type,
         ...(f.choices ? { choices: f.choices } : {}),
       };

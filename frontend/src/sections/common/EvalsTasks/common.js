@@ -181,22 +181,23 @@ export const EvalTaskFilterDefinition = (observeId) => {
   return filters;
 };
 
-// span_attributes_filters
-// [
-//     {
-//         "columnId": "llm.output_messages.0.message.content",
-//         "filterConfig": {
-//             "colType": "SPAN_ATTRIBUTE",
-//             "filterOp": "equals",
-//             "filterType": "text",
-//             "filterValue": "asdasdasd"
-//         }
-//     }
-// ]
+// TraceFilterPanel `fieldCategory` → BE col_type enum. Fallback only —
+// the row's `apiColType` (set by TraceFilterPanel via metricToTraceFilterProperty)
+// is the source of truth when present.
+export const FIELD_CATEGORY_TO_COL_TYPE = {
+  attribute: "SPAN_ATTRIBUTE",
+  system: "SYSTEM_METRIC",
+  eval: "EVAL_METRIC",
+  annotation: "ANNOTATION",
+};
 
-// Reserved keys on the saved BE filters dict that are metadata, not
-// user-visible filter rows. Everything else is treated as a generic
-// system filter (one row per value).
+// Column ids the BE always routes through its annotation handler regardless
+// of col_type. Pin them to ANNOTATION on the wire so the dispatcher doesn't
+// also feed them to SPAN_ATTRIBUTE / SYSTEM_METRIC handlers.
+export const ANNOTATION_COLUMN_IDS = new Set(["annotator", "my_annotations"]);
+
+// Reserved metadata keys on the saved BE filters dict — every other key
+// becomes a generic system filter row.
 const RESERVED_FILTER_KEYS = new Set([
   "project_id",
   "date_range",
@@ -206,12 +207,7 @@ const RESERVED_FILTER_KEYS = new Set([
   "span_attributes_filters",
 ]);
 
-// Legacy → current vocabulary aliases. The TraceFilterPanel column
-// for span observation type was renamed from `observation_type` to
-// `span_kind`; old tasks in the DB still use the legacy key, so map
-// it back to the new field on hydration so the filter row appears
-// under the correct column in the UI. Add a new entry here if any
-// other system column is ever renamed.
+// Legacy → current vocabulary aliases for the system-filter hydration path.
 const FILTER_KEY_ALIAS = {
   observation_type: "span_kind",
 };
@@ -219,12 +215,9 @@ const FILTER_KEY_ALIAS = {
 export const formatTaskFilters = (filters_applied) => {
   if (!filters_applied) return [];
 
-  // Attribute filters carry a nested {columnId, filterConfig} shape on
-  // the BE — keep their dedicated converter. Prefer the canonical
-  // `filters` key; fall back to the legacy `span_attributes_filters` so
-  // un-migrated rows still hydrate. `colType` is carried back into
-  // `apiColType` so TaskFilterBar.convertOldToNew can re-route the row
-  // to the right panel chip (annotator picker, eval-score input, ...).
+  // Attribute filters carry a {columnId, filterConfig} shape. Prefer the
+  // canonical `filters` key; fall back to legacy `span_attributes_filters`.
+  // `colType` round-trips as `apiColType` so the panel picks the right chip.
   const span_attributes_filters = (
     filters_applied.filters || filters_applied.span_attributes_filters || []
   ).map((i) => ({
@@ -239,16 +232,9 @@ export const formatTaskFilters = (filters_applied) => {
     },
   }));
 
-  // Every other top-level key is treated as a generic system filter:
-  // one filter row per value. Round-trips arbitrary keys (span_kind,
-  // latency_ms, total_tokens, status_code, …) without each one needing
-  // to be hard-coded here.
-  //
-  // canonicalEntries (not Object.entries) drops the camelCase aliases
-  // the axios interceptor auto-attaches alongside every snake_case
-  // key — without it we'd render duplicate chips like `span_kind` AND
-  // `spanKind`, and the reserved-key skip would miss `projectId` /
-  // `dateRange` because the set only lists the snake_case forms.
+  // Every other top-level key → one generic system-filter row per value.
+  // canonicalEntries skips the camelCase aliases the axios interceptor adds
+  // (avoids duplicate chips + correctly filters reserved keys).
   const systemFilters = [];
   canonicalEntries(filters_applied).forEach(([key, vals]) => {
     if (RESERVED_FILTER_KEYS.has(key)) return;

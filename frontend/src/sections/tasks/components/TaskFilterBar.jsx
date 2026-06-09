@@ -13,36 +13,27 @@ import { getRandomId } from "src/utils/utils";
 import TraceFilterPanel, {
   useTraceFilterProperties,
 } from "src/sections/projects/LLMTracing/TraceFilterPanel";
+import { FIELD_CATEGORY_TO_COL_TYPE } from "src/sections/common/EvalsTasks/common";
+import { useDashboardFilterValues } from "src/hooks/useDashboards";
+import {
+  getPickerOptionLabel,
+  getPickerOptionSecondaryLabel,
+  getPickerOptionValue,
+} from "src/sections/projects/LLMTracing/filterValuePickerUtils";
 
-// ── Operator handling — canonical backend ops ──
-//
-// `TraceFilterPanel` (PR #432 / TH-4924) emits canonical backend op names
-// directly: `equals`, `not_equals`, `in`, `not_in`, `contains`,
-// `not_contains`, `starts_with`, `ends_with`, `is_null`, `is_not_null`,
-// `greater_than`, `greater_than_or_equal`, `less_than`,
-// `less_than_or_equal`, `between`, `not_between`. The thumbs / categorical
-// / id-only dropdowns inside the panel still emit legacy `is`/`is_not` —
-// alias those to canonical so the wire is consistent.
+// Legacy `is`/`is_not` (from thumbs / categorical / id-only dropdowns) →
+// canonical BE ops emitted by TraceFilterPanel everywhere else.
 const LEGACY_OP_ALIAS = { is: "equals", is_not: "not_equals" };
 
 const RANGE_OPS = new Set(["between", "not_between"]);
 const LIST_OPS = new Set(["in", "not_in"]);
 const NO_VALUE_OPS = new Set(["is_null", "is_not_null"]);
 
-// TraceFilterPanel emits `apiColType` directly on each row. When it's
-// missing (legacy rows / hand-built filters), derive from `fieldCategory`.
-const PANEL_CAT_TO_COL_TYPE = {
-  attribute: "SPAN_ATTRIBUTE",
-  system: "SYSTEM_METRIC",
-  eval: "EVAL_METRIC",
-  annotation: "ANNOTATION",
-};
 const resolveApiColType = (apiColType, fieldCategory) =>
-  apiColType || PANEL_CAT_TO_COL_TYPE[fieldCategory] || "SPAN_ATTRIBUTE";
+  apiColType || FIELD_CATEGORY_TO_COL_TYPE[fieldCategory] || "SPAN_ATTRIBUTE";
 
-// Legacy string ops persisted before TH-4924 land in form state as
-// `equals`/`not_equals`. Rewrite to `in`/`not_in` on read so the new
-// panel renders the row under the multi-value picker.
+// Legacy `equals`/`not_equals` on string rows → multi-value `in`/`not_in`
+// on hydration so the new panel renders the multi-select picker.
 const HYDRATE_STRING_OP = { equals: "in", not_equals: "not_in" };
 
 const isStringLike = (fieldType) =>
@@ -88,14 +79,8 @@ const OP_DISPLAY = {
   not_equal_to: "≠",
 };
 
-// ── new panel filter → form filter(s) ──
-//
-// List ops (`in`/`not_in`) carry the full array on a single form row so
-// the wire keeps the BE's canonical shape; range ops carry a 2-element
-// array; no-value ops omit `filterValue`; other ops explode into one
-// scalar row per value so system-filter accumulation keeps working.
-// `fieldCategory` / `fieldLabel` are stashed for the live preview and
-// chip rendering — zod strips them on submit.
+// Panel filter → form row(s). List/range ops keep array `filterValue`;
+// no-value ops drop it; other ops explode into one scalar row per value.
 function convertNewToOld(newFilters) {
   const out = [];
   (newFilters || []).forEach((f) => {
@@ -118,7 +103,6 @@ function convertNewToOld(newFilters) {
       property: isAttribute ? "attributes" : f.field,
       propertyId: f.field,
       fieldCategory: f.fieldCategory || "system",
-      // Panel rows expose the display name as `fieldName`; fall back for legacy callers.
       fieldLabel: f.fieldName || f.fieldLabel || f.field,
       apiColType: resolveApiColType(f.apiColType, f.fieldCategory),
     };
@@ -211,8 +195,7 @@ function convertOldToNew(oldFilters) {
         fieldLabel: f.fieldLabel || field,
         fieldType,
         fieldCategory: category,
-        // Preserved across the round-trip so the panel re-renders the right
-        // chip (annotator picker, eval-score input, ...) on edit-open.
+        // Preserved so the panel re-renders the right chip on edit-open.
         apiColType: resolveApiColType(
           f.apiColType || f?.filterConfig?.colType,
           category,
@@ -311,10 +294,8 @@ FilterChip.propTypes = {
   onRemove: PropTypes.func.isRequired,
 };
 
-// Map task rowType → TraceFilterPanel `tab` so the property picker
-// surfaces Trace ID / Span ID the same way LLM Tracing does. Callers
-// use inconsistent casing ("spans"/"Span", "traces"/"Trace") so we
-// normalize. Sessions / voiceCalls return null (no id fields).
+// Task rowType → TraceFilterPanel `tab`. Sessions / voiceCalls have no
+// id-field tab. Casing is normalized to handle inconsistent callers.
 const rowTypeToFilterTab = (rowType) => {
   const key = String(rowType || "").toLowerCase();
   if (key === "spans" || key === "span") return "spans";
@@ -346,14 +327,46 @@ const TaskFilterBar = ({
     for (const p of properties) map[p.id] = p;
     return map;
   }, [properties]);
+
+  // Resolve annotator user UUIDs → "Name (email)" for chip values.
+  const hasAnnotatorFilter = panelFilters.some((f) => f.field === "annotator");
+  const { data: annotatorOptions = [] } = useDashboardFilterValues({
+    metricName: "annotator",
+    metricType: "annotation_metric",
+    projectIds: projectId ? [projectId] : [],
+    source: "traces",
+    enabled: hasAnnotatorFilter,
+  });
+  const annotatorLabelById = useMemo(() => {
+    const map = {};
+    for (const opt of annotatorOptions) {
+      const value = String(getPickerOptionValue(opt));
+      if (!value) continue;
+      const label = getPickerOptionLabel(opt);
+      const email = getPickerOptionSecondaryLabel(opt);
+      map[value] = email ? `${label} (${email})` : label;
+    }
+    return map;
+  }, [annotatorOptions]);
+
   const enrichedFilters = useMemo(
     () =>
       panelFilters.map((f) => {
-        if (f.fieldName || f.fieldLabel !== f.field) return f;
         const prop = propertyById[f.field];
-        return prop ? { ...f, fieldLabel: prop.name } : f;
+        let next = f;
+        if (!f.fieldName && f.fieldLabel === f.field && prop) {
+          next = { ...next, fieldLabel: prop.name };
+        }
+        if (f.field === "annotator" && Object.keys(annotatorLabelById).length) {
+          const remap = (v) => annotatorLabelById[String(v)] || v;
+          next = {
+            ...next,
+            value: Array.isArray(f.value) ? f.value.map(remap) : remap(f.value),
+          };
+        }
+        return next;
       }),
-    [panelFilters, propertyById],
+    [panelFilters, propertyById, annotatorLabelById],
   );
 
   // Keep local panel state in sync with form filters when they change externally

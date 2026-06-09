@@ -249,13 +249,9 @@ const DetailsEdit = ({
   });
 
   const onUpdateSubmit = (data, editType) => {
-    // extractAttributeFilters now returns every chip (SPAN_ATTRIBUTE,
-    // SYSTEM_METRIC, EVAL_METRIC, ANNOTATION, has_*) as a flat list with
-    // `col_type` — matches list_spans_observe / the new BE dispatcher.
-    // observation_type still rides as a sibling key.
+    // Flat chip list with col_type for the BE dispatcher; observation_type
+    // (incl. node_type alias) still rides as a sibling key.
     const attributeFilters = extractAttributeFilters(data?.filters);
-    // node_type is the FE alias for observation_type — both end up in
-    // the outer `observation_type` sibling key (see TaskDetailPage.jsx).
     const observationTypes = (data.filters || [])
       .filter(
         (f) => f.property === "observation_type" || f.property === "node_type",
